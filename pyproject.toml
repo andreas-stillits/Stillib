@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stillib"
+version = "0.1.0"
+description = "A utility library for scientific research in python"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [{name = "Andreas Stillits", email = "andreas.stillits@gmail.com"}]
+dependencies = ["argcomplete>=3.6.3", "pydantic>=2.12.4"]
+# dependencies are defined in environment.yml instead
+
+
+[tool.hatch.build.targets.wheel]
+# optionally one can have different "wheels", e.g. CPU version and a GPU version
+packages = ["src/stillib"]
+
+[project.optional-dependencies]
+# optional developmental tools for quick maintainence
+dev = ["ruff", "black", "mypy", "pytest"]
+
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+select = [
+    "E",
+    "F",
+    "I",
+    "B"
+]
+
+ignore = [
+    "E501"  # line length handled by black
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stillib"]
