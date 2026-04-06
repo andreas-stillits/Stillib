@@ -12,13 +12,20 @@ class Task:
     x: int
 
 
-def init_worker() -> None:
-    # Put one-time worker setup here if needed.
-    # Example: set BLAS thread limits, load a model, etc.
-    pass
+_STATE: dict[str, object] = {}
+# state will be worker-specific when using multiprocessing,
+#   so safe to use global mutable state
+
+
+def init_worker(model_path: str, calibration_path: str) -> None:
+    _STATE["model"] = load_model(model_path)
+    _STATE["calibration"] = np.load(calibration_path)
+    return
 
 
 def execute_task(task: Task) -> float:
+    model = _STATE["model"]
+    calibration = _STATE["calibration"]
     if task.x == 13:
         raise ValueError("bad luck")
     return sqrt(task.x)
