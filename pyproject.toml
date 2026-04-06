@@ -1,46 +1,34 @@
-[build-system]
-requires = ["hatchling>=1.26"]
-build-backend = "hatchling.build"
-
-[project]
-name = "stillib"
-version = "0.1.0"
-description = "A utility library for scientific research in python"
-readme = "README.md"
-requires-python = ">=3.12"
-license = {file = "LICENSE"}
-authors = [{name = "Andreas Stillits", email = "andreas.stillits@gmail.com"}]
-dependencies = ["argcomplete>=3.6.3", "pydantic>=2.12.4"]
-# dependencies are defined in environment.yml instead
-
-
-[tool.hatch.build.targets.wheel]
-# optionally one can have different "wheels", e.g. CPU version and a GPU version
-packages = ["src/stillib"]
-
-[project.optional-dependencies]
-# optional developmental tools for quick maintainence
-dev = ["ruff", "black", "mypy", "pytest"]
-
-
-[tool.black]
-line-length = 88
-target-version = ['py312']
-
 [tool.ruff]
 line-length = 88
 target-version = "py312"
 
+[tool.ruff.lint]
 select = [
-    "E",
-    "F",
-    "I",
-    "B"
-]
+    "E", # code style (indentation, whitepspace, linebreaks, etc.)
+    "F", # correctness (undefined names, unused imports, etc.)
+    "I", # import sorting (alphabetical, type, first-party/third-party, etc.)
+    "B", # bugbear (potential bugs, e.g., bare except, etc.)
+    "UP", # update style (suggest newer syntax for target-version)
+    "SIM", # simplify (complex expressions, nested statements, etc.)
+    "EM", # exceptions (messsage style, etc.)
+    "PIE", # quality of life rules
 
-ignore = [
-    "E501"  # line length handled by black
 ]
+fixable = ["ALL"] # what is ruff allowed to auto-fix
+ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["stillib"]
+known-first-party = ["stillib-parallelism", "stillib-randomness", "stillib-propagation", "stillib-plotting"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "libs"]
+addopts = "-ra"
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+
