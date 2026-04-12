@@ -82,23 +82,36 @@ def collect(
     completed: list[CompletedTask[InputType, OutputType]] = []
     failures: list[FailedTask[InputType]] = []
 
-    for outcome in _iter_outcomes(
-        tasks,
-        worker_function,
-        max_workers=max_workers,
-        buffersize=buffersize,
-        initializer=initializer,
-        initargs=initargs,
-        progress_callback=progress_callback,
-        task_namer=task_namer,
-        interrupt_policy=interrupt_policy,
-    ):
-        if isinstance(outcome, FailedTask):
-            if error_policy == "raise":
-                raise TaskExecutionError(outcome)
-            failures.append(outcome)
-        else:
-            completed.append(outcome)
+    try:
+
+        for outcome in _iter_outcomes(
+            tasks,
+            worker_function,
+            max_workers=max_workers,
+            buffersize=buffersize,
+            initializer=initializer,
+            initargs=initargs,
+            progress_callback=progress_callback,
+            task_namer=task_namer,
+            interrupt_policy=interrupt_policy,
+        ):
+            if isinstance(outcome, FailedTask):
+                if error_policy == "raise":
+                    raise TaskExecutionError(outcome)
+                failures.append(outcome)
+            else:
+                completed.append(outcome)
+
+    except KeyboardInterrupt as exc:
+        report = RunReport(
+            completed=completed,
+            failed=failures,
+            interrupted=True,
+            elapsed_time=time.perf_counter() - time_start,
+        )
+        if error_policy == "collect":
+            return report
+        raise ParallelRunInterrupted(report) from exc
 
     return RunReport(
         completed=completed,

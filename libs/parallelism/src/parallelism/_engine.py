@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 import traceback
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sized
 from concurrent.futures import (
     FIRST_COMPLETED,
     Future,
@@ -21,6 +21,22 @@ from .models import (
     ProgressUpdate,
     TaskOutcome,
 )
+
+
+def _attempt_len(tasks: Iterable[InputType]) -> int | None:
+    if isinstance(tasks, Sized):
+        return len(tasks)
+    return None
+
+
+def _task_name(
+    index: int,
+    task: InputType,
+    task_namer: Callable[[InputType], str] | None = None,
+) -> str:
+    if task_namer is not None:
+        return task_namer(task)
+    return f"Task-{index}"
 
 
 def _run_task(
@@ -75,6 +91,11 @@ def _iter_outcomes(
         raise ValueError("buffersize must be >= 1")
 
     task_iterator = enumerate(tasks)
+    total: int | None = _attempt_len(tasks)
+    submitted: int = 0
+    completed: int = 0
+    failed: int = 0
+    started: float = time.perf_counter()
 
     # dictionary mapping futures to their corresponding task index and input
     inflight: dict[Future[tuple[bool, Any, float]], tuple[int, InputType]] = {}
@@ -109,6 +130,7 @@ def _iter_outcomes(
                 future = executor.submit(_run_task, task, worker_function)
                 # map this future to its task index and input for later retrieval
                 inflight[future] = (index, task)
+                submitted += 1
             # At this point we've submitted as many as buffersize tasks to be inflight
 
             # if no tasks are inflight, we are done
@@ -131,18 +153,34 @@ def _iter_outcomes(
                     yield CompletedTask(
                         index=index,
                         task=task,
-                        task_name="",
+                        task_name=_task_name(index, task, task_namer),
                         result=payload,
                         elapsed_time=elapsed_time,
                     )
+                    completed += 1
                 # if the future raised an exception, we yield a FailedTask and info
                 else:
                     yield FailedTask(
                         index=index,
                         task=task,
-                        task_name="",
+                        task_name=_task_name(index, task, task_namer),
                         exc_type=payload["exc_type"],
                         exc_message=payload["exc_message"],
                         traceback=payload["traceback"],
                         elapsed_time=elapsed_time,
                     )
+                    failed += 1
+
+                # if we have a progress callback, we call it with the current progress
+                if progress_callback is None:
+                    continue
+                progress_callback(
+                    ProgressUpdate(
+                        submitted=submitted,
+                        completed=completed,
+                        failed=failed,
+                        running=submitted - completed - failed,
+                        total=total,
+                        elapsed_time=time.perf_counter() - started,
+                    )
+                )
