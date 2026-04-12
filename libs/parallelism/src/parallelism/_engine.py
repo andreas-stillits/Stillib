@@ -64,7 +64,7 @@ def _run_task(
         return True, result, time.perf_counter() - started
 
 
-def _iter_outcomes(
+def _iter_outcomes_as_completed(
     tasks: Iterable[InputType],
     worker_function: Callable[[InputType], OutputType],
     *,
@@ -184,3 +184,17 @@ def _iter_outcomes(
                         elapsed_time=time.perf_counter() - started,
                     )
                 )
+
+
+def _iter_outcomes_as_submitted(
+    outcomes: Iterator[TaskOutcome[InputType, OutputType]],
+) -> Iterator[TaskOutcome[InputType, OutputType]]:
+    pending = {}
+    next_expected = 0
+
+    for outcome in outcomes:
+        pending[outcome.index] = outcome
+
+        while next_expected in pending:
+            yield pending.pop(next_expected)
+            next_expected += 1

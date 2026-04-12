@@ -4,7 +4,7 @@ import time
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-from ._engine import _iter_outcomes
+from ._engine import _iter_outcomes_as_completed
 from .models import (
     CompletedTask,
     ErrorPolicy,
@@ -40,7 +40,7 @@ def stream(
     Raises KeyboardInterrupt on Ctrl+C, with behavior depending on interrupt_policy.
     """
 
-    for outcome in _iter_outcomes(
+    for outcome in _iter_outcomes_as_completed(
         tasks,
         worker_function,
         max_workers=max_workers,
@@ -84,7 +84,7 @@ def collect(
 
     try:
 
-        for outcome in _iter_outcomes(
+        for outcome in _iter_outcomes_as_completed(
             tasks,
             worker_function,
             max_workers=max_workers,
