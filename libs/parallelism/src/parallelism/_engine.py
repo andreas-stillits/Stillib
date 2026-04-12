@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 import traceback
-from collections.abc import Callable, Iterable, Iterator, Sized
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
     FIRST_COMPLETED,
     Future,
@@ -12,13 +12,11 @@ from concurrent.futures import (
 )
 from typing import Any
 
-from .batching import default_buffersize
 from .models import (
     CompletedTask,
     FailedTask,
     InputType,
     InterruptPolicy,
-    Ordering,
     OutputType,
     ProgressUpdate,
     TaskOutcome,
