@@ -18,54 +18,54 @@ class ProgressUpdate:
     failed: int
     running: int
     total: int | None
-    duration: float
+    elapsed_time: float
 
 
 @dataclass(slots=True)
-class TaskSuccess[InputType, OutputType]:
+class CompletedTask[InputType, OutputType]:
     index: int
     task: InputType
     task_name: str
     result: OutputType
-    duration: float
+    elapsed_time: float
 
 
 @dataclass(slots=True)
-class TaskFailure[InputType]:
+class FailedTask[InputType]:
     index: int
     task: InputType
     task_name: str
     exc_type: str
     exc_message: str
     traceback: str
-    duration: float
+    elapsed_time: float
 
 
-type TaskOutcome[InputType, OutputType] = TaskSuccess[
+type TaskOutcome[InputType, OutputType] = CompletedTask[
     InputType, OutputType
-] | TaskFailure[InputType]
+] | FailedTask[InputType]
 
 
 @dataclass(slots=True)
 class RunReport[InputType, OutputType]:
-    successes: list[TaskSuccess[InputType, OutputType]]
-    failures: list[TaskFailure[InputType]]
+    completed: list[CompletedTask[InputType, OutputType]]
+    failed: list[FailedTask[InputType]]
     interrupted: bool
-    duration: float
+    elapsed_time: float
 
     @property
     def ok(self) -> bool:
-        return (not self.failures) and (not self.interrupted)
+        return (not self.failed) and (not self.interrupted)
 
     @property
     def results(self) -> list[OutputType]:
-        return [item.result for item in self.successes]
+        return [item.result for item in self.completed]
 
 
 class TaskExecutionError(RuntimeError):
     def __init__(
         self,
-        failure: TaskFailure[Any],
+        failure: FailedTask[Any],
         partial_report: RunReport[Any, Any] | None = None,
     ) -> None:
         self.failure = failure
@@ -81,28 +81,3 @@ class ParallelRunInterrupted(KeyboardInterrupt):
     def __init__(self, partial_report: RunReport[Any, Any]) -> None:
         self.partial_report = partial_report
         super().__init__("Parallel run interrupted by user")
-
-
-@dataclass(slots=True)
-class _BatchSubmission[InputType]:
-    indexes: list[int]
-    tasks: list[InputType]
-
-
-@dataclass(slots=True)
-class _BatchItemSuccess[OutputType]:
-    position: int
-    result: OutputType
-    duration: float
-
-
-@dataclass(slots=True)
-class _BatchItemFailure:
-    position: int
-    exc_type: str
-    exc_message: str
-    traceback: str
-    duration: float
-
-
-type _BatchItem[OutputType] = _BatchItemSuccess[OutputType] | _BatchItemFailure

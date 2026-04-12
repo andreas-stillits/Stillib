@@ -24,9 +24,3 @@ def chunked(
     # if final didnt reach batch size, send it off anyway
     if batch:
         yield batch
-
-
-def default_buffersize(
-    max_workers: int,
-) -> int:
-    return max(1, 2 * max_workers)

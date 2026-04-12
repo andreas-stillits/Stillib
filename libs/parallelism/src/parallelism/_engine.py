@@ -14,292 +14,137 @@ from typing import Any
 
 from .batching import default_buffersize
 from .models import (
+    CompletedTask,
+    FailedTask,
     InputType,
     InterruptPolicy,
     Ordering,
     OutputType,
     ProgressUpdate,
-    TaskFailure,
     TaskOutcome,
-    TaskSuccess,
-    _BatchItem,
-    _BatchItemFailure,
-    _BatchItemSuccess,
-    _BatchSubmission,
 )
+
+
+def _run_task(
+    task: Any, worker_function: Callable[[Any], Any]
+) -> tuple[bool, Any, float]:
+    """
+    Run a single task and catch exceptions gracefully
+    Args:
+        task: The task to run
+        worker_function: The function to run the task with
+    Returns:
+        A tuple of (success, result / failure_info, elapsed_time)
+    """
+    started = time.perf_counter()
+    try:
+        result = worker_function(task)
+    except Exception as exc:
+        failure = {
+            "exc_type": type(exc).__name__,
+            "exc_message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        return False, failure, time.perf_counter() - started
+    else:
+        return True, result, time.perf_counter() - started
 
 
 def _iter_outcomes(
     tasks: Iterable[InputType],
     worker_function: Callable[[InputType], OutputType],
     *,
-    max_workers: int | None,
-    ordering: Ordering,
-    batch_size: int,
-    buffersize: int | None,
-    initializer: Callable[..., Any] | None,
-    init_args: tuple[Any, ...],
-    progress_callback: Callable[[ProgressUpdate], None] | None,
-    task_namer: Callable[[InputType], str] | None,
-    interrupt_policy: InterruptPolicy,
+    max_workers: int | None = None,
+    buffersize: int | None = None,
+    initializer: Callable[..., Any] | None = None,
+    initargs: tuple[Any, ...] = (),
+    progress_callback: Callable[[ProgressUpdate], None] | None = None,
+    task_namer: Callable[[InputType], str] | None = None,
+    interrupt_policy: InterruptPolicy = "cancel",
 ) -> Iterator[TaskOutcome[InputType, OutputType]]:
     """
-    Core engine for stream_parallel, yielding TaskOutcome objects as they come in.
-    See stream_parallel in for user-facing docstring and parameter validation.
-    """
-    if ordering not in ("completion", "input"):
-        raise ValueError("ordering must be 'completion' or 'input'")
-    if interrupt_policy not in ("cancel", "drain"):
-        raise ValueError("interrupt_policy must be 'cancel' or 'drain'")
-    if batch_size < 1:
-        raise ValueError("batch_size must be >= 1")
+    Internal engine.
 
+    Submits tasks lazily, keeps a bounded number of futures in flight,
+    and yields TaskOutcomes in completion order.
+    """
     resolved_workers = max_workers or (os.cpu_count() or 1)
-    resolved_buffersize = buffersize or default_buffersize(resolved_workers)
+    resolved_buffersize = buffersize or (2 * resolved_workers)
+
+    if resolved_workers < 1:
+        raise ValueError("max_workers must be >= 1")
     if resolved_buffersize < 1:
         raise ValueError("buffersize must be >= 1")
 
-    total = _maybe_len(tasks)
-    time_start = time.perf_counter()
-    submitted = 0
-    completed = 0
-    failed = 0
+    task_iterator = enumerate(tasks)
 
-    def emit_progress() -> None:
-        if progress_callback is None:
-            return
-        progress_callback(
-            ProgressUpdate(
-                submitted,
-                completed,
-                failed,
-                running=submitted - completed - failed,
-                total=total,
-                duration=time.perf_counter() - time_start,
-            )
-        )
+    # dictionary mapping futures to their corresponding task index and input
+    inflight: dict[Future[tuple[bool, Any, float]], tuple[int, InputType]] = {}
 
-    indexed_batches = _indexed_batches(tasks, batch_size)
-    inflight: dict[
-        Future[list[_BatchItem[OutputType]]], _BatchSubmission[InputType]
-    ] = {}
-    pending_by_index: dict[int, TaskOutcome[InputType, OutputType]] = {}
-    next_expected_index = 0
-
-    executor = ProcessPoolExecutor(
+    with ProcessPoolExecutor(
         max_workers=resolved_workers,
         initializer=initializer,
-        initargs=init_args,
-    )
-    shutdown_called = False
+        initargs=initargs,
+    ) as executor:
+        # Submit batch of tasks
 
-    def submit_until_full(stop_submitting: bool = False) -> bool:
-        nonlocal submitted
-
-        if stop_submitting:
-            return False
-
+        # boolean flag to indicate if the buffer is empty
         exhausted = False
 
-        while len(inflight) < resolved_buffersize:
-            try:
-                batch = next(indexed_batches)
-            except StopIteration:
-                exhausted = True
-                break
+        # inflight tracks pending futures, exhausted tracks if we've submitted all tasks
+        # and we loop until both conditions are met
+        while inflight or not exhausted:
+            # within a single buffersize batch
+            while not exhausted and len(inflight) < resolved_buffersize:
 
-            future = executor.submit(_run_batch, batch.tasks, worker_function)
-            inflight[future] = batch
-            submitted += len(batch.tasks)
-            emit_progress()
+                # get next task, if any, else break to start new submission
+                try:
+                    index, task = next(task_iterator)
 
-        return exhausted
-
-    def outcomes_from_done(
-        done_futures: set[Future[list[_BatchItem[OutputType]]]],
-        *,
-        force_flush_all_input_ready: bool = False,
-    ) -> list[TaskOutcome[InputType, OutputType]]:
-        nonlocal completed, failed, next_expected_index
-
-        ready: list[TaskOutcome[InputType, OutputType]] = []
-
-        for future in done_futures:
-            batch = inflight.pop(future, None)
-            if batch is None:
-                continue
-
-            if future.cancelled():
-                continue
-
-            try:
-                batch_items = future.result()
-            except Exception as exc:  # pool-level failure, not worker_function failure
-                batch_start = batch.indexes[0] if batch.indexes else -1
-                raise RuntimeError(
-                    f"Process pool failed while executing batch "
-                    f"starting at input index {batch_start}"
-                ) from exc
-
-            for item in batch_items:
-                index = batch.indexes[item.position]
-                task = batch.tasks[item.position]
-                task_name = _task_name(index, task, task_namer)
-
-                if isinstance(item, _BatchItemSuccess):
-                    outcome: TaskOutcome[InputType, OutputType] = TaskSuccess(
-                        index,
-                        task,
-                        task_name,
-                        item.result,
-                        item.duration,
-                    )
-                    completed += 1
-                else:
-                    outcome = TaskFailure(
-                        index,
-                        task,
-                        task_name,
-                        item.exc_type,
-                        item.exc_message,
-                        item.traceback,
-                        item.duration,
-                    )
-                    failed += 1
-
-                if ordering == "completion":
-                    ready.append(outcome)
-                else:
-                    pending_by_index[index] = outcome
-
-        if ordering == "input":
-            if force_flush_all_input_ready:
-                for index in sorted(pending_by_index):
-                    ready.append(pending_by_index[index])
-                pending_by_index.clear()
-            else:
-                while next_expected_index in pending_by_index:
-                    ready.append(pending_by_index.pop(next_expected_index))
-                    next_expected_index += 1
-
-        emit_progress()
-        return ready
-
-    try:
-        source_exhausted = submit_until_full(stop_submitting=False)
-
-        while inflight or not source_exhausted:
-            if not inflight:
-                source_exhausted = submit_until_full(stop_submitting=False)
-                if not inflight and source_exhausted:
+                # break out to wait for inflight tasks to complete and yield results,
+                # if no more tasks to submit
+                except StopIteration:
+                    exhausted = True
                     break
 
-            done, _ = wait(
-                tuple(inflight),
-                timeout=0.1,
-                return_when=FIRST_COMPLETED,
-            )
+                # submit the next task and track its future
+                future = executor.submit(_run_task, task, worker_function)
+                # map this future to its task index and input for later retrieval
+                inflight[future] = (index, task)
+            # At this point we've submitted as many as buffersize tasks to be inflight
 
-            if done:
-                for outcome in outcomes_from_done(done):
-                    yield outcome
+            # if no tasks are inflight, we are done
+            if not inflight:
+                break  # breaks out of both while loops
 
-            source_exhausted = submit_until_full(stop_submitting=False)
+            # wait until the first of the inflight futures
+            done, _ = wait(tuple(inflight), return_when=FIRST_COMPLETED)
 
-    except KeyboardInterrupt:
-        if interrupt_policy == "drain":
-            # Stop submitting new work, but let everything already submitted finish.
-            while inflight:
-                done, _ = wait(tuple(inflight), return_when=FIRST_COMPLETED)
-                for outcome in outcomes_from_done(done):
-                    yield outcome
+            # when the first future has completed,
+            # we yield its result and remove it from the inflight dict
+            for future in done:
+                # remove from inflight an retrieve index, task input
+                index, task = inflight.pop(future)
+                # return status, payload and elapsed time of the completed future
+                success, payload, elapsed_time = future.result()
 
-            executor.shutdown(wait=True, cancel_futures=False)
-            shutdown_called = True
-            raise
-
-        # interrupt_policy == "cancel"
-        # Cancel pending futures if possible, rescue only futures already done.
-        done_now = {future for future in inflight if future.done()}
-        for future in list(inflight):
-            if future not in done_now:
-                future.cancel()
-
-        for outcome in outcomes_from_done(
-            done_now,
-            force_flush_all_input_ready=(ordering == "input"),
-        ):
-            yield outcome
-
-        executor.shutdown(wait=False, cancel_futures=True)
-        shutdown_called = True
-        raise
-
-    finally:
-        if not shutdown_called:
-            executor.shutdown(wait=True, cancel_futures=False)
-
-
-def _indexed_batches(
-    tasks: Iterable[InputType], batch_size: int
-) -> Iterator[_BatchSubmission[InputType]]:
-    batch_indexes: list[int] = []
-    batch_tasks: list[InputType] = []
-
-    for index, task in enumerate(tasks):
-        batch_indexes.append(index)
-        batch_tasks.append(task)
-
-        if len(batch_tasks) >= batch_size:
-            yield _BatchSubmission(indexes=batch_indexes, tasks=batch_tasks)
-            batch_indexes = []
-            batch_tasks = []
-
-    if batch_tasks:
-        yield _BatchSubmission(indexes=batch_indexes, tasks=batch_tasks)
-
-
-def _maybe_len(tasks: Iterable[Any]) -> int | None:
-    return len(tasks) if isinstance(tasks, Sized) else None
-
-
-def _task_name(
-    index: int,
-    task: InputType,
-    task_namer: Callable[[InputType], str] | None,
-) -> str:
-    if task_namer is not None:
-        return task_namer(task)
-    return f"task-{index}"
-
-
-def _run_batch(
-    batch_tasks: list[Any],
-    worker_function: Callable[[Any], Any],
-) -> list[_BatchItem[Any]]:
-    outcomes: list[_BatchItem[Any]] = []
-
-    for position, task in enumerate(batch_tasks):
-        started = time.perf_counter()
-        try:
-            result = worker_function(task)
-        except Exception as exc:
-            outcomes.append(
-                _BatchItemFailure(
-                    position,
-                    type(exc).__name__,
-                    str(exc),
-                    traceback.format_exc(),
-                    duration=time.perf_counter() - started,
-                )
-            )
-        else:
-            outcomes.append(
-                _BatchItemSuccess(
-                    position,
-                    result,
-                    duration=time.perf_counter() - started,
-                )
-            )
-
-    return outcomes
+                # if the future completed successfully, we yield a CompletedTask
+                if success:
+                    yield CompletedTask(
+                        index=index,
+                        task=task,
+                        task_name="",
+                        result=payload,
+                        elapsed_time=elapsed_time,
+                    )
+                # if the future raised an exception, we yield a FailedTask and info
+                else:
+                    yield FailedTask(
+                        index=index,
+                        task=task,
+                        task_name="",
+                        exc_type=payload["exc_type"],
+                        exc_message=payload["exc_message"],
+                        traceback=payload["traceback"],
+                        elapsed_time=elapsed_time,
+                    )

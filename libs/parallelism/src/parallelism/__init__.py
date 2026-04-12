@@ -1,13 +1,14 @@
-from .api import collect_parallel, stream_parallel
+from .api import collect, stream
 from .batching import chunked
-from .models import ProgressUpdate, RunReport, TaskFailure, TaskSuccess
+from .models import CompletedTask, FailedTask, ProgressUpdate, RunReport, TaskOutcome
 
 __all__ = [
-    "stream_parallel",
-    "collect_parallel",
+    "stream",
+    "collect",
     "ProgressUpdate",
-    "TaskSuccess",
-    "TaskFailure",
+    "TaskOutcome",
+    "FailedTask",
+    "CompletedTask",
     "RunReport",
     "chunked",
 ]
