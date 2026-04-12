@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stillib-randomness"
+name = "stillib-random"
 version = "0.1.0"
 description = "Random Number Generator utilities for scientific computing."
 readme = "README.md"
@@ -27,5 +27,5 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["stillib_randomness*"]
+include = ["stillib_random*"]
 namespaces = false

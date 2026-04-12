@@ -15,10 +15,10 @@ select = [
 
 ]
 fixable = ["ALL"] # what is ruff allowed to auto-fix
-ignore = ["EM101", "EM102"]
+ignore = ["EM101", "EM102", "F401"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["stillib-parallelism", "stillib-randomness", "stillib-propagation", "stillib-plotting"]
+known-first-party = ["stillib-parallelism", "stillib-random", "stillib-propagation", "stillib-plotting"]
 
 [tool.ruff.format]
 quote-style = "double"
