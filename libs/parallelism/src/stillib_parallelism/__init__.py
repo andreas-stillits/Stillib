@@ -1,5 +1,4 @@
 from .api import collect, stream
-from .batching import chunked
 from .models import CompletedTask, FailedTask, ProgressUpdate, RunReport, TaskOutcome
 
 __all__ = [
@@ -10,5 +9,4 @@ __all__ = [
     "FailedTask",
     "CompletedTask",
     "RunReport",
-    "chunked",
 ]
