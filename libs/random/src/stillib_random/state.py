@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ._internals import _map_for_json
 from .provenance import RNGManifest
 
 if TYPE_CHECKING:
@@ -22,6 +25,28 @@ class RNGSnapshot:
     manifest: RNGManifest
     bit_generator_name: str  # attribute name of the genertor in np.random
     bit_generator_state: dict[str, Any]  # the state of the generator
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "manifest": _map_for_json(asdict(self.manifest)),
+            "bit_generator_name": self.bit_generator_name,
+            "bit_generator_state": _map_for_json(self.bit_generator_state),
+        }
+
+
+def snapshot_from_dict(data: dict[str, Any]) -> RNGSnapshot:
+    if "manifest" not in data:
+        raise ValueError("Missing 'manifest' in snapshot data")
+    if "bit_generator_name" not in data:
+        raise ValueError("Missing 'bit_generator_name' in snapshot data")
+    if "bit_generator_state" not in data:
+        raise ValueError("Missing 'bit_generator_state' in snapshot data")
+
+    return RNGSnapshot(
+        manifest=RNGManifest(**data["manifest"]),
+        bit_generator_name=data["bit_generator_name"],
+        bit_generator_state=data["bit_generator_state"],
+    )
 
 
 @dataclass(slots=True)
@@ -46,7 +71,12 @@ class RNGCursor:
     @classmethod
     def from_snapshot(cls, snapshot: RNGSnapshot) -> RNGCursor:
         # get the generator class from its name saved in snapshot
-        bit_generator_cls = getattr(np.random, snapshot.bit_generator_name)
+        try:
+            bit_generator_cls = getattr(np.random, snapshot.bit_generator_name)
+        except AttributeError as exc:
+            raise ValueError(
+                f"Unknown bit generator: {snapshot.bit_generator_name}"
+            ) from exc
         # instanciate a new generator
         bit_generator = bit_generator_cls()
         # assign the generator state as saved in snapshot
@@ -68,3 +98,22 @@ class RNGCursor:
             type(bit_generator).__name__,
             copy.deepcopy(bit_generator.state),
         )
+
+    def save_snapshot(self, path: Path) -> None:
+        with path.open("w", encoding="utf-8") as f:
+            snapshot = self.snapshot()
+            f.write(json.dumps(snapshot.to_dict(), indent=4))
+
+
+def save_snapshot(cursor: RNGCursor, path: str | Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cursor.save_snapshot(path)
+
+
+def load_snapshot(path: str | Path) -> RNGCursor:
+    path = Path(path)
+    with path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+        snapshot = snapshot_from_dict(data)
+        return snapshot
