@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stillib-propagation"
+name = "stillib-montecarlo"
 version = "0.1.0"
-description = "Monte Carlo Propagation utilities for scientific computing."
+description = "Monte Carlo Simulation utilities for scientific computing."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -27,5 +27,5 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["stillib_propagation*"]
+include = ["stillib_montecarlo*"]
 namespaces = false

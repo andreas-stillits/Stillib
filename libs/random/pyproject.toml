@@ -12,7 +12,9 @@ license = { text = "MIT" }
 authors = [
   { name = "Andreas Stillits", email = "andreas.stillits@gmail.com" }
 ]
-dependencies = []
+dependencies = [
+  "numpy>=2.4.*",
+]
 
 [project.optional-dependencies]
 dev = [

@@ -12,7 +12,9 @@ license = { text = "MIT" }
 authors = [
   { name = "Andreas Stillits", email = "andreas.stillits@gmail.com" }
 ]
-dependencies = []
+dependencies = [
+  "matplotlib>=3.10.*",
+]
 
 [project.optional-dependencies]
 dev = [
