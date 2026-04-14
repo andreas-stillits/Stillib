@@ -24,6 +24,16 @@ class Constant[T](Source[T]):
     def sample_once(self, rng: np.random.Generator) -> T:
         return self.value
 
+    def sample_many(self, rng: np.random.Generator, n_samples: int):
+        if n_samples < 1:
+            raise ValueError("n_samples must be >= 1")
+
+        # broadcast if numpy
+        if isinstance(self.value, np.ndarray):
+            return np.broadcast_to(self.value, (n_samples,) + self.value.shape)
+        else:
+            return [self.value] * n_samples
+
 
 @dataclass(frozen=True, slots=True)
 class Empirical[T](Source[T]):
@@ -44,7 +54,7 @@ class Empirical[T](Source[T]):
             raise ValueError("n_samples must be >= 1")
 
         try:
-            return rng.choice(self.values, size=n_samples, replace=True).tolist()
+            return rng.choice(self.values, size=n_samples, replace=True)
         except Exception:
             # Fallback to sampling one by one if values are not compatible with vectorized choice
             return [self.sample_once(rng) for _ in range(n_samples)]

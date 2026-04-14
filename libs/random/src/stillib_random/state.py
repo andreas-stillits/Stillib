@@ -58,7 +58,11 @@ class RNGCursor:
     """
 
     stream_manifest: RNGManifest  # stream identity
-    generator: np.random.Generator  # the current state of the generator
+    stream_generator: np.random.Generator  # the current state of the generator
+
+    @property
+    def generator(self) -> np.random.Generator:
+        return self.stream_generator
 
     @classmethod
     def from_stream(cls, stream: RNGStream) -> RNGCursor:
