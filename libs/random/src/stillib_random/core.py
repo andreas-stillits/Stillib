@@ -7,10 +7,17 @@ import numpy as np
 
 from ._internals import label_to_uint32, normalize_label
 from .provenance import RNGManifest
+from .state import RNGCursor
 
 
 @dataclass(frozen=True, slots=True)
 class RNGStream:
+    """
+    Where does the stream come from?
+    What child streams can it derive?
+    How do I reconstruct the same stream elsewhere?
+    """
+
     _seed_sequence: np.random.SeedSequence
     label: str = "root"
 
@@ -36,9 +43,6 @@ class RNGStream:
             ),
             label=manifest.label,
         )
-
-    def generator(self) -> np.random.Generator:
-        return np.random.default_rng(self._seed_sequence)
 
     def spawn(self, label: str) -> RNGStream:
         label = normalize_label(label)
@@ -66,3 +70,9 @@ class RNGStream:
             entropy=self._seed_sequence.entropy,
             spawn_key=self._seed_sequence.spawn_key,
         )
+
+    def generator(self) -> np.random.Generator:
+        return np.random.default_rng(self._seed_sequence)
+
+    def cursor(self) -> RNGCursor:
+        return RNGCursor.from_stream(self)
