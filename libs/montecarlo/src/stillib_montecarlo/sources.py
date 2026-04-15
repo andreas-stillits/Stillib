@@ -8,91 +8,103 @@ import numpy as np
 
 
 class Source[T]:
-    def sample_once(self, rng: np.random.Generator) -> T:
+    def sample(self, rng: np.random.Generator) -> T:
         raise NotImplementedError
 
-    def sample_many(self, rng: np.random.Generator, n_samples: int):
-        if n_samples < 1:
-            raise ValueError("n_samples must be >= 1")
-        return [self.sample_once(rng) for _ in range(n_samples)]
+
+class SupportsVectorizedSampling(Protocol):
+    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray: ...
 
 
 @dataclass(frozen=True, slots=True)
 class Constant[T](Source[T]):
     value: T
+    numpy_cast: Callable[[T], np.ndarray] | None = None
 
-    def sample_once(self, rng: np.random.Generator) -> T:
+    def sample(self, rng: np.random.Generator) -> T:
         return self.value
 
-    def sample_many(self, rng: np.random.Generator, n_samples: int):
+    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray:
         if n_samples < 1:
             raise ValueError("n_samples must be >= 1")
-
-        # broadcast if numpy
-        if isinstance(self.value, np.ndarray):
-            return np.broadcast_to(self.value, (n_samples,) + self.value.shape)
+        if self.numpy_cast is None:  # if no custom casting provided
+            arr = np.asarray(self.value)  # wrap in array for broadcasting
         else:
-            return [self.value] * n_samples
+            arr = self.numpy_cast(self.value)  # apply custom casting if provided
+        return np.broadcast_to(
+            arr, (n_samples, *arr.shape)
+        )  # cast to correct shape where axis 0 is the sample axis
 
 
 @dataclass(frozen=True, slots=True)
 class Empirical[T](Source[T]):
     values: tuple[T, ...]
+    numpy_cast: Callable[[tuple[T, ...]], np.ndarray] | None = None
 
-    # Accept an Iterable but map to tuple for internal use
-    def __init__(self, values: Iterable[T]) -> None:
+    # Accept any iterable but store as a tuple for immutability and consistency
+    def __init__(
+        self,
+        values: Iterable[T],
+        numpy_cast: Callable[[tuple[T, ...]], np.ndarray] | None = None,
+    ) -> None:
         values = tuple(values)
         if not values:
-            raise ValueError("Empirical distribution must have at least one value.")
+            raise ValueError("Empirical source must have at least one value.")
         object.__setattr__(self, "values", values)
+        object.__setattr__(self, "numpy_cast", numpy_cast)
 
-    def sample_once(self, rng: np.random.Generator) -> T:
-        return rng.choice(self.values, replace=True)
+    def sample(self, rng: np.random.Generator) -> T:
+        idx = int(rng.integers(0, len(self.values)))
+        return self.values[idx]
 
-    def sample_many(self, rng: np.random.Generator, n_samples: int):
+    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray:
         if n_samples < 1:
             raise ValueError("n_samples must be >= 1")
 
-        try:
-            return rng.choice(self.values, size=n_samples, replace=True)
-        except Exception:
-            # Fallback to sampling one by one if values are not compatible with vectorized choice
-            return [self.sample_once(rng) for _ in range(n_samples)]
+        if self.numpy_cast is None:  # if no custom casting provided
+            arr = np.asarray(self.values)  # wrap in array for vectorized indexing
+        else:
+            arr = self.numpy_cast(self.values)  # apply custom casting if provided
+
+        # verify that the first axis is used for sampling
+        if arr.shape[0] != len(self.values):
+            raise ValueError(
+                "numpy_cast must return an array where the first dimension matches the number of values."
+            )
+
+        idxs = rng.integers(0, len(self.values), size=n_samples)
+        return arr[idxs]
 
 
 @dataclass(frozen=True, slots=True)
 class Model[T](Source[T]):
-    draw_once: Callable[[np.random.Generator], T]
-    draw_many: Callable[[np.random.Generator, int], object] | None = None
+    draw: Callable[[np.random.Generator], T] | None = None
+    draw_numpy: Callable[[np.random.Generator, int], np.ndarray] | None = None
 
-    def sample_once(self, rng: np.random.Generator) -> T:
-        return self.draw_once(rng)
+    @classmethod
+    def single(cls, draw: Callable[[np.random.Generator], T]) -> Model[T]:
+        return cls(draw=draw, draw_numpy=None)
 
-    def sample_many(self, rng: np.random.Generator, n_samples: int):
+    @classmethod
+    def numpy(
+        cls, draw_numpy: Callable[[np.random.Generator, int], np.ndarray]
+    ) -> Model[T]:
+        return cls(draw=None, draw_numpy=draw_numpy)
+
+    def sample(self, rng: np.random.Generator) -> T:
+        if self.draw is None:
+            raise NotImplementedError(
+                "draw function is not implemented for this Model."
+            )
+        return self.draw(rng)
+
+    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray:
         if n_samples < 1:
             raise ValueError("n_samples must be >= 1")
-
-        # if the user provided a vectorized draw function, use it
-        if self.draw_many is not None:
-            try:
-                return self.draw_many(rng, n_samples)
-            except Exception:
-                pass
-
-        # Fallback to one-by-one sampling for downstream vectorization
-        return [self.sample_once(rng) for _ in range(n_samples)]
-
-
-def constant[T](value: T) -> Constant[T]:
-    return Constant(value)
-
-
-def empirical[T](values: Iterable[T]) -> Empirical[T]:
-    return Empirical(values)
-
-
-def model[T](
-    draw_once: Callable[[np.random.Generator], T],
-    draw_many: Callable[[np.random.Generator, int], object] | None = None,
-) -> Model[T]:
-    return Model(draw_once, draw_many)
+        if self.draw_numpy is not None:
+            return self.draw_numpy(rng, n_samples)
+        assert self.draw is not None, (
+            "At least one of draw or draw_numpy must be implemented."
+        )
+        # fallback to single sampling if vectorized version is not provided
+        return np.stack([np.asarray(self.draw(rng)) for _ in range(n_samples)], axis=0)

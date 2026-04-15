@@ -5,7 +5,7 @@ from collections.abc import Callable
 import numpy as np
 
 from .results import SimulationResult
-from .sources import Source
+from .sources import Source, SupportsVectorizedSampling
 
 
 def propagate[T, R](
@@ -38,9 +38,20 @@ def propagate_vectorized[T, R](
     if n_samples < 1:
         raise ValueError("n_samples must be >= 1")
 
-    if n_samples < 1:
-        raise ValueError("n_samples must be >= 1")
+    sampled_args = []
 
-    sampled_args = [arg.sample_many(rng, n_samples) for arg in args]
+    for arg in args:
+        if isinstance(arg, SupportsVectorizedSampling):
+            try:
+                sampled_arg = arg.sample_numpy(rng, n_samples)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Error during vectorized sampling of argument {arg}: {exc}"
+                ) from exc
+            sampled_args.append(sampled_arg)
+        else:
+            raise TypeError(f"Source {arg} does not support vectorized numpy sampling")
+        sampled_args.append(sampled_arg)
+
     results = func(*sampled_args)
     return SimulationResult(results)
