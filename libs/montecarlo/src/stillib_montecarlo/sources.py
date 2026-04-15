@@ -11,9 +11,8 @@ class Source[T]:
     def sample(self, rng: np.random.Generator) -> T:
         raise NotImplementedError
 
-
-class SupportsVectorizedSampling(Protocol):
-    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray: ...
+    def sample_numpy(self, rng: np.random.Generator, n_samples: int) -> np.ndarray:
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)
