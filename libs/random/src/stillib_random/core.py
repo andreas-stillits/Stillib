@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 
 from ._internals import label_to_uint32, normalize_label
-from .provenance import RNGManifest
+from .manifest import RNGManifest
 from .state import RNGCursor
 
 
@@ -21,19 +23,20 @@ class RNGStream:
     _seed_sequence: np.random.SeedSequence
     label: str = "root"
 
-    # classmethods recieve the class itself instead of an instance of it
-    # in that sense this is a factory for creating an instance in different ways
+    # derive a stream from a seed and provide a label for provenance
     @classmethod
     def from_seed(cls, seed: int, label: str = "root") -> RNGStream:
         label = normalize_label(label)
         return cls(np.random.SeedSequence(seed), label=label)
 
+    # choose a predefined seed instead
     @classmethod
     def from_entropy(cls, label: str = "root") -> RNGStream:
         label = normalize_label(label)
         seed = secrets.randbits(128)
         return cls(np.random.SeedSequence(seed), label=label)
 
+    # reconstruct a stream from a manifest (entropy/seed + spawn_key)
     @classmethod
     def from_manifest(cls, manifest: RNGManifest) -> RNGStream:
         return cls(
@@ -46,10 +49,15 @@ class RNGStream:
 
     def spawn(self, label: str) -> RNGStream:
         label = normalize_label(label)
-        child_index = label_to_uint32(label)
+        child_index = label_to_uint32(
+            label
+        )  # derive spawn key number (int) deterministically from the label
         child_seed_sequence = np.random.SeedSequence(
             entropy=self._seed_sequence.entropy,
-            spawn_key=(*self._seed_sequence.spawn_key, child_index),
+            spawn_key=(
+                *self._seed_sequence.spawn_key,
+                child_index,
+            ),  # combine parent spawn key and child contribution deterministically
         )
         return RNGStream(child_seed_sequence, label=label)
 
@@ -65,9 +73,15 @@ class RNGStream:
         ]
 
     def manifest(self) -> RNGManifest:
+        entropy = self._seed_sequence.entropy
+        if entropy is None:
+            raise ValueError("SeedSequence has no entropy, cannot create manifest")
+
+        entropy = cast(int | Sequence[int], entropy)
+
         return RNGManifest(
             label=self.label,
-            entropy=self._seed_sequence.entropy,
+            entropy=entropy,
             spawn_key=self._seed_sequence.spawn_key,
         )
 

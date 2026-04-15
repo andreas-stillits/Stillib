@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from .core import RNGStream
-from .provenance import RNGManifest
+from .manifest import RNGManifest
 
 
 @dataclass(frozen=True, slots=True)

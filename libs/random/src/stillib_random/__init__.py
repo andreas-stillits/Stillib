@@ -1,5 +1,5 @@
 from .core import RNGStream
-from .provenance import RNGManifest
+from .manifest import RNGManifest
 from .state import RNGCursor, RNGSnapshot, load_snapshot, save_snapshot
 
 

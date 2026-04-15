@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ._internals import _map_for_json
-from .provenance import RNGManifest
+from .manifest import RNGManifest
 
 if TYPE_CHECKING:
     from .core import RNGStream
@@ -99,7 +99,7 @@ class RNGCursor:
         return RNGSnapshot(
             self.stream_manifest,
             type(bit_generator).__name__,
-            copy.deepcopy(bit_generator.state),
+            copy.deepcopy(dict(bit_generator.state)),
         )
 
     def save_snapshot(self, path: Path) -> None:
