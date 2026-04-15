@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stillib-montecarlo"
-version = "0.1.0"
+version = "1.1.0"
 description = "Monte Carlo Simulation utilities for scientific computing."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,7 +12,9 @@ license = { text = "MIT" }
 authors = [
   { name = "Andreas Stillits", email = "andreas.stillits@gmail.com" }
 ]
-dependencies = []
+dependencies = [
+  "numpy>=2.4",
+]
 
 [project.optional-dependencies]
 dev = [

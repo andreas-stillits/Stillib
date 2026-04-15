@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stillib-plotting"
-version = "0.1.0"
+version = "1.1.0"
 description = "Plotting utilities for scientific computing."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,7 +13,7 @@ authors = [
   { name = "Andreas Stillits", email = "andreas.stillits@gmail.com" }
 ]
 dependencies = [
-  "matplotlib>=3.10.*",
+  "matplotlib>=3.10",
 ]
 
 [project.optional-dependencies]

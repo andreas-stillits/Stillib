@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, overload
 
-PathLike = str | Path
-Kind = Literal["dir", "file"]
+type PathLike = str | Path
+type Kind = Literal["dir", "file"]
 
 
 class PathsError(Exception):
@@ -21,56 +21,42 @@ class WrongPathTypeError(PathsError):
     """Raised when a path exists but is not the expected type."""
 
 
+def ensure(path: PathLike, kind: Kind = "dir") -> Path:
+    path = Path(path)
+    if kind == "dir":
+        path.mkdir(parents=True, exist_ok=True)
+    elif kind == "file":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(exist_ok=True)
+    else:
+        raise ValueError(f"Unknown path kind: {kind!r}")
+    return path
+
+
+def require(path: PathLike, kind: Kind = "dir") -> Path:
+    path = Path(path)
+    if not path.exists():
+        raise MissingPathError(f"Required path does not exist: {path}")
+
+    if kind == "dir" and not path.is_dir():
+        raise WrongPathTypeError(f"Expected directory but found: {path}")
+
+    if kind == "file" and not path.is_file():
+        raise WrongPathTypeError(f"Expected file but found: {path}")
+
+    return path
+
+
 @dataclass(frozen=True)
 class PathRef:
     path: Path
     kind: Kind = "dir"  # "dir" or "file"
 
     def ensure(self) -> Path:
-        """
-        Ensure that the referenced path exists.
-
-        For directories:
-            creates the directory and parents if missing.
-
-        For files:
-            creates parent directories and touches the file if missing.
-        """
-        if self.kind == "dir":
-            self.path.mkdir(parents=True, exist_ok=True)
-        elif self.kind == "file":
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.touch(exist_ok=True)
-        else:
-            raise ValueError(f"Unknown path kind: {self.kind!r}")
-        return self.path
+        return ensure(self.path, self.kind)
 
     def require(self) -> Path:
-        """
-        Require that the referenced path exists and has the expected type.
-
-        Returns
-        -------
-        Path
-            The underlying concrete path.
-
-        Raises
-        ------
-        MissingPathError
-            If the path does not exist.
-        WrongPathTypeError
-            If the path exists but is not the expected file/dir kind.
-        """
-        if not self.path.exists():
-            raise MissingPathError(f"Required path does not exist: {self.path}")
-
-        if self.kind == "dir" and not self.path.is_dir():
-            raise WrongPathTypeError(f"Expected directory but found: {self.path}")
-
-        if self.kind == "file" and not self.path.is_file():
-            raise WrongPathTypeError(f"Expected file but found: {self.path}")
-
-        return self.path
+        return require(self.path, self.kind)
 
     # mirror common Path methods for convenience
     def exists(self) -> bool:

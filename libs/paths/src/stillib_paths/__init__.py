@@ -1,3 +1,3 @@
-from .core import PathLike, PathsBase, child_paths, path_field
+from .core import PathLike, PathsBase, child_paths, ensure, path_field, require
 
-__all__ = ["PathsBase", "PathLike", "path_field", "child_paths"]
+__all__ = ["PathsBase", "PathLike", "path_field", "child_paths", "ensure", "require"]
