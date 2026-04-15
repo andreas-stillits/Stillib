@@ -7,8 +7,6 @@ from typing import TypeVar
 from .core import RNGStream
 from .provenance import RNGManifest
 
-TaskType = TypeVar("TaskType")
-
 
 @dataclass(frozen=True, slots=True)
 class TaskStream[TaskType]:
@@ -16,13 +14,13 @@ class TaskStream[TaskType]:
     manifest: RNGManifest
 
 
-def assign_streams(
-    tasks: Iterable[TaskType],
+def assign_streams[Task](
+    tasks: Iterable[Task],
     root_stream: RNGStream,
     *,
-    task_namer: Callable[[TaskType], str] | None = None,
-) -> list[TaskStream[TaskType]]:
-    assigned: list[TaskStream[TaskType]] = []
+    task_namer: Callable[[Task], str] | None = None,
+) -> list[TaskStream[Task]]:
+    assigned: list[TaskStream[Task]] = []
 
     for index, task in enumerate(tasks):
         label = task_namer(task) if task_namer is not None else f"task-{index}"
