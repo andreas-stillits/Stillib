@@ -60,10 +60,6 @@ class RNGCursor:
     stream_manifest: RNGManifest  # stream identity
     stream_generator: np.random.Generator  # the current state of the generator
 
-    @property
-    def generator(self) -> np.random.Generator:
-        return self.stream_generator
-
     @classmethod
     def from_stream(cls, stream: RNGStream) -> RNGCursor:
         # simply construct
@@ -92,11 +88,14 @@ class RNGCursor:
             generator,
         )
 
+    def generator(self) -> np.random.Generator:
+        return self.stream_generator
+
     # save the current state of the generator in a snapshot, which can be used to restore the generator later
     def snapshot(
         self,
     ) -> RNGSnapshot:
-        bit_generator = self.generator.bit_generator
+        bit_generator = self.stream_generator.bit_generator
         return RNGSnapshot(
             self.stream_manifest,
             type(bit_generator).__name__,
@@ -115,7 +114,7 @@ def save_snapshot(cursor: RNGCursor, path: str | Path) -> None:
     cursor.save_snapshot(path)
 
 
-def load_snapshot(path: str | Path) -> RNGCursor:
+def load_snapshot(path: str | Path) -> RNGSnapshot:
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
