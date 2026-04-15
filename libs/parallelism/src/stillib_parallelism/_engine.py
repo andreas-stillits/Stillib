@@ -15,15 +15,13 @@ from typing import Any
 from .models import (
     CompletedTask,
     FailedTask,
-    InputType,
-    OutputType,
     ProgressUpdate,
     TaskOutcome,
 )
 
 
 # helper to attempt a count of total tasks, returns None if not possible (e.g. if tasks is a generator)
-def _attempt_len(tasks: Iterable[InputType]) -> int | None:
+def _attempt_len[Task](tasks: Iterable[Task]) -> int | None:
     # if __len__ is implemented, return it, else return None
     if isinstance(tasks, Sized):
         return len(tasks)
@@ -31,10 +29,10 @@ def _attempt_len(tasks: Iterable[InputType]) -> int | None:
 
 
 # helper to assign a task name
-def _task_name(
+def _task_name[Task](
     index: int,
-    task: InputType,
-    task_namer: Callable[[InputType], str] | None = None,
+    task: Task,
+    task_namer: Callable[[Task], str] | None = None,
 ) -> str:
     # if task_namer is provided, use it to get the task name, else default to "task-{index}"
     if task_namer is not None:
@@ -70,17 +68,17 @@ def _run_task(
 
 # the main engine function, which lazily submits tasks to the executor, keeps a bounded number of tasks inflight,
 # and yields TaskOutcomes as they complete, regardless of submission order.
-def _iter_outcomes_as_completed(
-    tasks: Iterable[InputType],
-    worker_function: Callable[[InputType], OutputType],
+def _iter_outcomes_as_completed[Task, Result](
+    tasks: Iterable[Task],
+    worker_function: Callable[[Task], Result],
     *,
     max_workers: int | None = None,
     buffersize: int | None = None,
     initializer: Callable[..., Any] | None = None,
     initargs: tuple[Any, ...] = (),
     progress_callback: Callable[[ProgressUpdate], None] | None = None,
-    task_namer: Callable[[InputType], str] | None = None,
-) -> Iterator[TaskOutcome[InputType, OutputType]]:
+    task_namer: Callable[[Task], str] | None = None,
+) -> Iterator[TaskOutcome[Task, Result]]:
     """
     Internal engine. Submits tasks lazily, keeps a bounded number of futures in flight,
     and yields TaskOutcomes in completion order.
@@ -118,7 +116,7 @@ def _iter_outcomes_as_completed(
     started: float = time.perf_counter()
 
     # dictionary mapping futures to their corresponding task index and input
-    inflight: dict[Future[tuple[bool, Any, float]], tuple[int, InputType]] = {}
+    inflight: dict[Future[tuple[bool, Any, float]], tuple[int, Task]] = {}
 
     # helper to emit progress updates after each task completion, if progress_callback is provided
     def _emit_progress() -> None:
@@ -137,8 +135,8 @@ def _iter_outcomes_as_completed(
 
     # helper to classify a completed future as a CompletedTask or FailedTask and return the appropriate TaskOutcome
     def _retrieve_outcome(
-        index: int, task: InputType, future: Future[tuple[bool, Any, float]]
-    ) -> TaskOutcome[InputType, OutputType]:
+        index: int, task: Task, future: Future[tuple[bool, Any, float]]
+    ) -> TaskOutcome[Task, Result]:
         # declare nonlocal to update progress counts within this helper
         nonlocal completed, failures
 
@@ -207,7 +205,6 @@ def _iter_outcomes_as_completed(
             while inflight or not exhausted:
                 # while the buffer is not full and further tasks can be submitted
                 while not exhausted and len(inflight) < resolved_buffersize:
-
                     # get next task, if any
                     try:
                         index, task = next(task_iterator)
@@ -273,15 +270,15 @@ def _iter_outcomes_as_completed(
 
 
 # helper to reorder outcomes from completion order to submission order, if the user requested input order
-def _iter_outcomes_as_submitted(
-    outcomes: Iterator[TaskOutcome[InputType, OutputType]],
-) -> Iterator[TaskOutcome[InputType, OutputType]]:
+def _iter_outcomes_as_submitted[Task, Result](
+    outcomes: Iterator[TaskOutcome[Task, Result]],
+) -> Iterator[TaskOutcome[Task, Result]]:
     """
     Yields task outcomes in input order (by index)
     OBS: this keeps outcomes in memory until the earliest pending task completes.
          Can thus be as memory intensive as a collect call
     """
-    pending: dict[int, TaskOutcome[InputType, OutputType]] = {}
+    pending: dict[int, TaskOutcome[Task, Result]] = {}
     next_expected = 0
 
     for outcome in outcomes:

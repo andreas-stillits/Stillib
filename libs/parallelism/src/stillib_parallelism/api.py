@@ -9,9 +9,7 @@ from .models import (
     CompletedTask,
     ErrorPolicy,
     FailedTask,
-    InputType,
     Ordering,
-    OutputType,
     ParallelRunInterrupted,
     ProgressUpdate,
     RunReport,
@@ -19,18 +17,18 @@ from .models import (
 )
 
 
-def stream(
-    tasks: Iterable[InputType],
-    worker_function: Callable[[InputType], OutputType],
+def stream[Task, Result](
+    tasks: Iterable[Task],
+    worker_function: Callable[[Task], Result],
     *,  # enforce keyword only for better readability
     max_workers: int | None = None,
     buffersize: int | None = None,
     initializer: Callable[..., Any] | None = None,
     initargs: tuple[Any, ...] = (),
     progress_callback: Callable[[ProgressUpdate], None] | None = None,
-    task_namer: Callable[[InputType], str] | None = None,
+    task_namer: Callable[[Task], str] | None = None,
     ordering: Ordering = "completion",
-) -> Iterator[OutputType]:
+) -> Iterator[Result]:
     """
     Streaming API to run tasks in parallel and yield results as they come in, with fail-fast behavior on errors.
     Args:
@@ -81,19 +79,19 @@ def stream(
         yield outcome.result
 
 
-def collect(
-    tasks: Iterable[InputType],
-    worker_function: Callable[[InputType], OutputType],
+def collect[Task, Result](
+    tasks: Iterable[Task],
+    worker_function: Callable[[Task], Result],
     *,  # enforce keyword only for better readability
     max_workers: int | None = None,
     buffersize: int | None = None,
     initializer: Callable[..., Any] | None = None,
     initargs: tuple[Any, ...] = (),
     progress_callback: Callable[[ProgressUpdate], None] | None = None,
-    task_namer: Callable[[InputType], str] | None = None,
+    task_namer: Callable[[Task], str] | None = None,
     ordering: Ordering = "input",
     error_policy: ErrorPolicy = "raise",
-) -> RunReport[InputType, OutputType]:
+) -> RunReport[Task, Result]:
     """
     Collection API to run tasks in parallel and collect results and failures in a report.
     Args:
@@ -126,8 +124,8 @@ def collect(
 
     # track time and results
     time_start = time.perf_counter()
-    completed: list[CompletedTask[InputType, OutputType]] = []
-    failures: list[FailedTask[InputType]] = []
+    completed: list[CompletedTask[Task, Result]] = []
+    failures: list[FailedTask[Task]] = []
 
     # catch user KeyboardInterrupt on Ctrl+C and wrap in ParallelRunInterrupted with a partial report for debugging
     try:
