@@ -14,11 +14,6 @@ from .state import RNGCursor
 
 @dataclass(frozen=True, slots=True)
 class RNGStream:
-    """
-    Where does the stream come from?
-    What child streams can it derive?
-    How do I reconstruct the same stream elsewhere?
-    """
 
     _seed_sequence: np.random.SeedSequence
     label: str = "root"

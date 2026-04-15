@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class RNGManifest:
-    """A manifest of the RNG state, used for provenance tracking."""
 
     label: str  # human readable identifier for the RNGStream
     entropy: int | Sequence[int]  # defines the root origin of randomness

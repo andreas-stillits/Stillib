@@ -1,6 +1,7 @@
 from .core import RNGStream
+from .io import load_snapshot, save_snapshot
 from .manifest import RNGManifest
-from .state import RNGCursor, RNGSnapshot, load_snapshot, save_snapshot
+from .state import RNGCursor, RNGSnapshot
 
 
 def from_seed(seed: int, label: str = "root") -> RNGStream:

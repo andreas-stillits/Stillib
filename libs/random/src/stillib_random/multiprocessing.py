@@ -18,16 +18,29 @@ def assign_streams[Task](
     tasks: Iterable[Task],
     root_stream: RNGStream,
     *,
-    task_namer: Callable[[Task], str] | None = None,
+    prefix: str = "task",
 ) -> list[TaskStream[Task]]:
-    assigned: list[TaskStream[Task]] = []
+    """
+    Assign a unique RNGStream to each task, derived from a root stream, and return a list of TaskStream objects containing the task and its RNG manifest.
+    Args:
+        tasks: An iterable of tasks to assign RNG streams to.
+        root_stream: The root RNGStream from which all task streams will be derived.
+        prefix: An optional prefix for the labels of the assigned streams. If not provided, labels will be generated as "task-0", "task-1", etc.
 
-    for index, task in enumerate(tasks):
-        label = task_namer(task) if task_namer is not None else f"task-{index}"
-        child = root_stream.spawn(label)
-        assigned.append(TaskStream(task, child.manifest()))
+    """
+    num_tasks = len(list(tasks))
+    streams: list[RNGStream] = root_stream.spawn_many(
+        num_tasks,
+        prefix=prefix,
+    )
 
-    return assigned
+    return [
+        TaskStream(
+            task,
+            stream.manifest(),
+        )
+        for task, stream in zip(tasks, streams, strict=True)
+    ]
 
 
 def stream_for_task(

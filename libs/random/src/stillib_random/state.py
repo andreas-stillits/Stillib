@@ -17,10 +17,6 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class RNGSnapshot:
-    """
-    What is stream identity?
-    What does it take to reconstruct a generator?
-    """
 
     manifest: RNGManifest
     bit_generator_name: str  # attribute name of the genertor in np.random
@@ -32,21 +28,6 @@ class RNGSnapshot:
             "bit_generator_name": self.bit_generator_name,
             "bit_generator_state": _map_for_json(self.bit_generator_state),
         }
-
-
-def snapshot_from_dict(data: dict[str, Any]) -> RNGSnapshot:
-    if "manifest" not in data:
-        raise ValueError("Missing 'manifest' in snapshot data")
-    if "bit_generator_name" not in data:
-        raise ValueError("Missing 'bit_generator_name' in snapshot data")
-    if "bit_generator_state" not in data:
-        raise ValueError("Missing 'bit_generator_state' in snapshot data")
-
-    return RNGSnapshot(
-        manifest=RNGManifest(**data["manifest"]),
-        bit_generator_name=data["bit_generator_name"],
-        bit_generator_state=data["bit_generator_state"],
-    )
 
 
 @dataclass(slots=True)
@@ -106,17 +87,3 @@ class RNGCursor:
         with path.open("w", encoding="utf-8") as f:
             snapshot = self.snapshot()
             f.write(json.dumps(snapshot.to_dict(), indent=4))
-
-
-def save_snapshot(cursor: RNGCursor, path: str | Path) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cursor.save_snapshot(path)
-
-
-def load_snapshot(path: str | Path) -> RNGSnapshot:
-    path = Path(path)
-    with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-        snapshot = snapshot_from_dict(data)
-        return snapshot
