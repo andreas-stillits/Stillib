@@ -5,7 +5,7 @@ import stillib_montecarlo as mc
 import stillib_random as r
 
 
-def func(x, y, z):
+def func(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
     return x + y + z
 
 

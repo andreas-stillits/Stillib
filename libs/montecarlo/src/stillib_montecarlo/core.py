@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+from typing import Protocol
 
 import numpy as np
+from numpy.typing import npt
 
 from .results import SimulationResult
 from .sources import Source
@@ -30,7 +32,7 @@ def propagate[R](
 
 def propagate_numpy(
     rng: np.random.Generator,
-    func: Callable[[tuple[np.ndarray, ...]], np.ndarray],
+    func: Callable[..., np.ndarray],
     args: tuple[Source, ...],
     *,
     n_samples: int,
