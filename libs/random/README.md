@@ -40,13 +40,16 @@ This object models an RNG stream. A stream  is the origin of a random sequence o
 - Where does the stream come from?
 - What child streams can it derive?
 - How do I reconstruct the same stream elsewhere? 
+A stream is defined by a np.random.SeedSequence which requires an entropy (base seed), a spawn key (sequence of index integers), and a human readible label.
+When a child is spawned, it inherits the same entropy, but deterministically derives a new index and forms it spawn key by appending that index to its parent's spawn key.
+In that way, the spawn key maps the lineage of a stream, and the random origin remains the original parent entropy/seed.
 
 
 ### RNGManifest
 
-This object carries the information to reconstruct a stream in a certain state.
+This object carries the information to reconstruct an RNGStream at another place and time.
 Instead of passing around mutable generators, one should pass a manifest and resconstruct the stream and its generator when needed.
-It is immutable after creation.
+It is immutable after creation, and contains the label as well as entropy + spawn key for np.random.SeedSequence reconstruction.
 
 
 ### RNGCursor
@@ -56,6 +59,7 @@ RNGCursor answers:
 - What is the current generator state?
 - How do I save and restore mid-run?
 - How do I continue exactly where I left off?
+An RNGStream predetermines a sequence of randomness, where the np.random.Generator keeps track of where we are in the sequence. If one only reconstructs a stream, all generators generated from it will start at the beginning of the sequence. Hence we need both the stream and and generator states to have full save/resume. The purpose of RNGCursor is to contain and work with this information
 
 
 ### RNGSnapshot
@@ -100,6 +104,7 @@ However, creating a snapshot, drawing N values, reconstructing the saved state a
 
 - Be aware that .spawn() derives the child identity from the passed label, where spawn_many() derives it deterministically from the parent regardless of the assigned label. 
 This was preferred to avoid dependence on a label-scheme and lose later repreducibility if labels were to change or be lost. The identity is instead fully tied to the index.
+- Creating an RNGStream using from_entropy() will pick a highly random seed from the 'secrets' library, which is importantly different at every run. One will thus not have reproducibility unless a snapshot/manifest is saved - the win is a highly random seed not picked by the user. 
 
 
 ## More Examples
