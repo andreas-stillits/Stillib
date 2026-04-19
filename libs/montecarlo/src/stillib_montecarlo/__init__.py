@@ -1,9 +1,9 @@
-from .core import propagate, propagate_vectorized
+from .core import propagate, propagate_numpy
 from .sources import Constant, Empirical, Model
 
 __all__ = [
     "propagate",
-    "propagate_vectorized",
+    "propagate_numpy",
     "Constant",
     "Empirical",
     "Model",

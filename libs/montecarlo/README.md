@@ -19,7 +19,9 @@ python installer.py montecarlo
 [smallest working example showing the core]
 
 ```python 
+from stillib_montecarlo import propagate, Constant, Empirical, Model
 from stillib_random import from_seed
+
 ```
 
 ## Core Concepts and Abstractions

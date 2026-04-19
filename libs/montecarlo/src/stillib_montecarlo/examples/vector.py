@@ -51,7 +51,7 @@ result1 = mc.propagate(
 
 t1 = perf_counter()
 
-result2 = mc.propagate_vectorized(
+result2 = mc.propagate_numpy(
     rng,
     func,
     (x, y, z_numpy),

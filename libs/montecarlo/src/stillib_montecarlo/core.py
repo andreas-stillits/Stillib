@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import numpy as np
 
@@ -8,9 +8,9 @@ from .results import SimulationResult
 from .sources import Source
 
 
-def propagate[T, R](
+def propagate[R](
     rng: np.random.Generator,
-    func: Callable[[T], R],
+    func: Callable[..., R],
     args: tuple[Source, ...],
     *,
     n_samples: int,
@@ -28,13 +28,13 @@ def propagate[T, R](
     return SimulationResult(results)
 
 
-def propagate_vectorized[T, R](
+def propagate_numpy(
     rng: np.random.Generator,
-    func: Callable[[T], R],
+    func: Callable[[tuple[np.ndarray, ...]], np.ndarray],
     args: tuple[Source, ...],
     *,
     n_samples: int,
-) -> SimulationResult[R]:
+) -> SimulationResult:
     if n_samples < 1:
         raise ValueError("n_samples must be >= 1")
 
