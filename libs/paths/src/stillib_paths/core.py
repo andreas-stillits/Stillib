@@ -117,7 +117,9 @@ class PathField[T]:
     def __get__(self, obj: T, owner: type | None = ...) -> PathRef: ...
 
     # declaration
-    def __get__(self, obj: T | None, owner: type | None = None):
+    def __get__(
+        self, obj: T | None, owner: type | None = None
+    ) -> PathField[T] | PathRef:
 
         # If not further accessing attributes (.pathfield  --> obj = None), return the descriptor
         if obj is None:
@@ -141,7 +143,15 @@ class ChildPathsField[T, P]:
     def __set_name__(self, owner: type, name: str) -> None:
         object.__setattr__(self, "name", name)
 
-    def __get__(self, obj: T | None, owner: type | None = None):
+    @overload
+    def __get__(self, obj: None, owner: type | None = ...) -> ChildPathsField[T, P]: ...
+
+    @overload
+    def __get__(self, obj: T, owner: type | None = ...) -> P: ...
+
+    def __get__(
+        self, obj: T | None, owner: type | None = None
+    ) -> ChildPathsField[T, P] | P:
         if obj is None:
             return self
 
@@ -177,7 +187,7 @@ def path_field[T](
 
 
 # decorator for child paths fields
-def child_paths[T, P](func: Callable[[T], P]) -> ChildPathsField[T, P]:
+def child_paths[T, P: PathsBase](func: Callable[[T], P]) -> ChildPathsField[T, P]:
     """
     Declare a nested path namespace.
 
