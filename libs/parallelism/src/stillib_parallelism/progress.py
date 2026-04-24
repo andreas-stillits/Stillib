@@ -11,12 +11,12 @@ def print_progress(update: ProgressUpdate) -> None:
     """
     total = "?" if update.total is None else str(update.total)
     line = (
-        f"submitted: {update.submitted}, \n"
-        f"completed: {update.completed}, \n"
-        f"failed: {update.failures}, \n"
-        f"running: {update.running}, \n"
-        f"total: {total}  \n"
-        f"elapsed: {update.elapsed_time:.2f}s \n"
+        f"submitted: {update.submitted},  "
+        f"completed: {update.completed},  "
+        f"failed: {update.failures},  "
+        f"running: {update.running},  "
+        f"total: {total}   "
+        f"elapsed: {update.elapsed_time:.2f}s  "
     )
 
     # clear line, return to start, print new status
