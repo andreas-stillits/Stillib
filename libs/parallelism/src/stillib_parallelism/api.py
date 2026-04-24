@@ -178,6 +178,9 @@ def collect[Task, Result](
         completed.sort(key=lambda item: item.index)
         failures.sort(key=lambda item: item.index)
 
+    if progress_callback is not None:
+        print()  # newline after progress prompt
+
     # return final report with all completed and failed tasks
     return RunReport(
         completed=completed,
