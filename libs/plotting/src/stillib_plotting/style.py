@@ -19,7 +19,7 @@ _DEFAULT_RCPARAMS = {
     "ytick.labelsize": 8,
     "legend.fontsize": 8,
     "axes.spines.top": False,
-    "axes.spines.right": False,
+    "axes.spines.right": True,
     "axes.linewidth": 0.8,
     "xtick.direction": "out",
     "ytick.direction": "out",
