@@ -83,7 +83,8 @@ class RNGCursor:
             copy.deepcopy(dict(bit_generator.state)),
         )
 
-    def save_snapshot(self, path: Path) -> None:
+    def save_snapshot(self, path: str | Path) -> None:
+        path = Path(path)
         with path.open("w", encoding="utf-8") as f:
             snapshot = self.snapshot()
             f.write(json.dumps(snapshot.to_dict(), indent=4))
